@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <!-- Viewport estricto para evitar zoom o scroll accidental en WebViews de Smart TV -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>App de Prueba - Whale OS / Android TV</title>
+  <style>
+    /* Reset total y bloqueo de scroll */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: #0b0f19;
+      color: #f3f4f6;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      cursor: none; /* Oculta cursor para experiencia nativa de TV */
+    }
+
+    /* Contenedor principal con margen de seguridad ("Overscan / Title Safe Zone") */
+    .tv-safe-area {
+      width: 100%;
+      height: 100%;
+      padding: 3.5vh 4vw; /* Zona de seguridad para TVs con overscan habilitado */
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+    }
+
+    /* Fondo ambiental sutil */
+    .bg-glow {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 60vw;
+      height: 60vh;
+      transform: translate(-50%, -50%);
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.08) 0%, rgba(11, 15, 25, 0) 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Header */
+    header {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 1;
+    }
+
+    .title-group {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .subtitle {
+      font-size: clamp(0.9rem, 1.4vw, 1.8rem);
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: #9ca3af;
+      font-weight: 600;
+    }
+
+    .main-title {
+      font-size: clamp(1.8rem, 3.2vw, 4rem);
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+      text-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
+    }
+
+    /* Badge de estado OK */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 1.2vw;
+      background: rgba(16, 185, 129, 0.15);
+      border: 2px solid #10b981;
+      padding: 1vh 2vw;
+      border-radius: 9999px;
+      box-shadow: 0 0 25px rgba(16, 185, 129, 0.35);
+    }
+
+    .pulse-dot {
+      width: 1.4vw;
+      height: 1.4vw;
+      min-width: 14px;
+      min-height: 14px;
+      border-radius: 50%;
+      background-color: #10b981;
+      box-shadow: 0 0 12px #10b981;
+      animation: pulse 1.5s infinite ease-in-out;
+    }
+
+    .status-text {
+      font-size: clamp(1.1rem, 1.8vw, 2.2rem);
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      color: #34d399;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+      50% {
+        transform: scale(1.35);
+        opacity: 0.6;
+      }
+    }
+
+    /* Centro: Indicador visual animado de 60 FPS y contador */
+    .center-stage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3vh;
+      z-index: 1;
+    }
+
+    .spinner-ring-container {
+      position: relative;
+      width: clamp(120px, 16vw, 220px);
+      height: clamp(120px, 16vw, 220px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .spinner-ring {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      border: 4px solid rgba(255, 255, 255, 0.08);
+      border-top-color: #38bdf8;
+      border-right-color: #818cf8;
+      animation: spin 1s linear infinite;
+      box-shadow: 0 0 20px rgba(56, 189, 248, 0.2);
+    }
+
+    @keyframes spin {
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
+    .fps-display {
+      text-align: center;
+    }
+
+    .fps-value {
+      font-size: clamp(2.2rem, 3.5vw, 4.5rem);
+      font-weight: 900;
+      color: #38bdf8;
+      line-height: 1;
+    }
+
+    .fps-label {
+      font-size: clamp(0.75rem, 1vw, 1.2rem);
+      font-weight: 600;
+      color: #64748b;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+
+    .uptime-box {
+      text-align: center;
+    }
+
+    .uptime-counter {
+      font-size: clamp(3.2rem, 6vw, 7.5rem);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #f9fafb;
+      text-shadow: 0 0 30px rgba(255, 255, 255, 0.15);
+      line-height: 1;
+    }
+
+    .uptime-label {
+      margin-top: 0.8vh;
+      font-size: clamp(0.9rem, 1.3vw, 1.6rem);
+      color: #94a3b8;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+    }
+
+    /* Barra inferior con métricas del Viewport */
+    footer {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1.5vw;
+      z-index: 1;
+    }
+
+    .metric-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 1.2vh 1.5vw;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4vh;
+    }
+
+    .metric-label {
+      font-size: clamp(0.75rem, 1vw, 1.2rem);
+      color: #64748b;
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+    }
+
+    .metric-value {
+      font-size: clamp(1.1rem, 1.6vw, 2.1rem);
+      font-weight: 700;
+      color: #e2e8f0;
+      white-space: nowrap;
+    }
+
+    .highlight {
+      color: #facc15;
+    }
+  </style>
+</head>
+<body>
+  <div class="tv-safe-area">
+    <div class="bg-glow"></div>
+
+    <!-- Header superior -->
+    <header>
+      <div class="title-group">
+        <span class="subtitle">Validación de Despliegue</span>
+        <h1 class="main-title">APP DE PRUEBA - WHALE OS / ANDROID TV</h1>
+      </div>
+
+      <div class="status-badge" id="statusBadge">
+        <div class="pulse-dot"></div>
+        <span class="status-text">ESTADO: OK</span>
+      </div>
+    </header>
+
+    <!-- Centro animado para validar 60 FPS y reactividad -->
+    <main class="center-stage">
+      <div class="spinner-ring-container">
+        <div class="spinner-ring"></div>
+        <div class="fps-display">
+          <div class="fps-value" id="fpsCounter">60</div>
+          <div class="fps-label">FPS</div>
+        </div>
+      </div>
+
+      <div class="uptime-box">
+        <div class="uptime-counter" id="uptimeCounter">00:00:00</div>
+        <div class="uptime-label">TIEMPO ACTIVO (RENDER EN VIVO)</div>
+      </div>
+    </main>
+
+    <!-- Footer con diagnóstico de pantalla -->
+    <footer>
+      <div class="metric-card">
+        <span class="metric-label">Viewport (CSS)</span>
+        <span class="metric-value" id="valViewport">Detectando...</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">Resolución Pantalla</span>
+        <span class="metric-value" id="valScreen">Detectando...</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">Escala DPR</span>
+        <span class="metric-value highlight" id="valDpr">Detectando...</span>
+      </div>
+      <div class="metric-card">
+        <span class="metric-label">Relación de Aspecto</span>
+        <span class="metric-value" id="valAspect">Detectando...</span>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    // 1. Contador de tiempo activo continuo
+    const startTime = performance.now();
+    const uptimeEl = document.getElementById('uptimeCounter');
+
+    function formatTime(ms) {
+      const totalSec = Math.floor(ms / 1000);
+      const hours = String(Math.floor(totalSec / 3600)).padStart(2, '0');
+      const minutes = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
+      const seconds = String(totalSec % 60).padStart(2, '0');
+      return `${hours}:${minutes}:${seconds}`;
+    }
+
+    // 2. Medidor de FPS en tiempo real basado en requestAnimationFrame
+    let frameCount = 0;
+    let lastFpsUpdate = performance.now();
+    const fpsEl = document.getElementById('fpsCounter');
+
+    function renderLoop(now) {
+      // Actualizar uptime
+      uptimeEl.textContent = formatTime(now - startTime);
+
+      // Calcular FPS cada segundo
+      frameCount++;
+      const delta = now - lastFpsUpdate;
+      if (delta >= 1000) {
+        const fps = Math.round((frameCount * 1000) / delta);
+        fpsEl.textContent = fps;
+        frameCount = 0;
+        lastFpsUpdate = now;
+      }
+
+      requestAnimationFrame(renderLoop);
+    }
+    requestAnimationFrame(renderLoop);
+
+    // 3. Detección y refresco de Métricas de Pantalla / Viewport
+    function updateScreenMetrics() {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const sw = window.screen.width;
+      const sh = window.screen.height;
+      const dpr = window.devicePixelRatio || 1;
+
+      // Viewport visible
+      document.getElementById('valViewport').textContent = `${vw} × ${vh} px`;
+
+      // Resolución física/pantalla
+      document.getElementById('valScreen').textContent = `${sw} × ${sh} px`;
+
+      // Escala DPR
+      document.getElementById('valDpr').textContent = `${dpr.toFixed(2)}x`;
+
+      // Relación de aspecto
+      const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));
+      const divisor = gcd(vw, vh);
+      const aspectW = Math.round(vw / divisor);
+      const aspectH = Math.round(vh / divisor);
+      document.getElementById('valAspect').textContent = `${aspectW}:${aspectH} (${(vw / vh).toFixed(2)})`;
+    }
+
+    window.addEventListener('resize', updateScreenMetrics);
+    window.addEventListener('orientationchange', updateScreenMetrics);
+    updateScreenMetrics();
+
+    // Confirmar en consola para depuración remota con Chrome DevTools (ADB)
+    console.log("[TV-TEST-APP] Inicializada con éxito.");
+  </script>
+</body>
+</html>
